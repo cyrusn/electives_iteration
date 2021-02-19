@@ -1,0 +1,19 @@
+{
+  "name": "subject_iteration",
+  "version": "1.0.0",
+  "description": "subject allocation with weighted ranking",
+  "main": "index.js",
+  "directories": {
+    "example": "example"
+  },
+  "scripts": {
+    "main": "node ./index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "CyrusN",
+  "license": "ISC",
+  "dependencies": {
+    "json2csv": "^5.0.6",
+    "lodash": "^4.17.20"
+  }
+}
