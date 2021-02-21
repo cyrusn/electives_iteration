@@ -6,11 +6,11 @@ const path = require('path')
 module.exports = class Allocation {
   constructor (students, ranks, combinations, subjectPlaces) {
     this.isLog = false
-    this.STUDENTS = students
     this.RANKS = ranks
     this.COMBINATIONS = combinations
     this.SUBJECT_PLACES = subjectPlaces
     this.SUBJECT_FILLED = _.mapValues(subjectPlaces, () => [])
+    this.STUDENTS = students
     this.IMMUNE_STUDENTS = _.cloneDeep(students)
     this.full = []
     this.failures = []
@@ -34,20 +34,19 @@ module.exports = class Allocation {
   }
 
   updateFailures (id) {
-    const { failures, removeIdFromRanks, removeFromSTUDENTS } = this
-    removeIdFromRanks.call(this, id)
+    const { failures, removeStudent } = this
+    removeStudent.call(this, id)
     if (_.includes(failures, id)) return
     failures.push(id)
-    removeFromSTUDENTS.call(this, id)
   }
 
-  removeFromSTUDENTS (id) {
-    const { STUDENTS } = this
+  // when a combination is assigned to a student, remove the student
+  // from student list
+  removeStudent (id) {
+    const { RANKS, STUDENTS } = this
+    // remove student from STUDENTS
     _.remove(STUDENTS, s => s.id === id)
-  }
 
-  removeIdFromRanks (id) {
-    const { RANKS } = this
     // remove student from all fields in overall
     _.pull(RANKS.overall, id)
 
@@ -55,7 +54,7 @@ module.exports = class Allocation {
     RANKS.combinations.forEach(rank => _.pull(rank, id))
   }
 
-  // The quota is the min of subjects' quota in the given combinationId
+  // The place is the min of subjects' place in the given combinationId
   get combinationPlaces () {
     const { COMBINATIONS, SUBJECT_PLACES } = this
     return _(COMBINATIONS)
@@ -65,8 +64,8 @@ module.exports = class Allocation {
       .value()
   }
 
-  /** findPriorityByCombinationId return a function for finding the preference
-  priority of a student. id is studentId */
+  /** findPriorityByCombinationId find the preference
+  priority of a student with combinationId*/
   findPriorityByCombinationId (id, combinationId, isRunningStudents) {
     const { STUDENTS, IMMUNE_STUDENTS, updateFailures } = this
     const searchFrom = isRunningStudents ? STUDENTS : IMMUNE_STUDENTS
@@ -85,36 +84,36 @@ module.exports = class Allocation {
     return id
   }
 
-  get zeroQuotaCombinations () {
+  get zeroPlacesCombinations () {
     const zeroSubjects = []
     const { SUBJECT_PLACES, COMBINATIONS } = this
-    _.forIn(SUBJECT_PLACES, (quota, subj) => {
-      if (quota === 0) {
+    _.forIn(SUBJECT_PLACES, (place, subj) => {
+      if (place === 0) {
         zeroSubjects.push(subj)
       }
     })
-    const zeroQuotaCombinations = []
+    const zeroPlacesCombinations = []
     COMBINATIONS.forEach((combination, combinationId) => {
       zeroSubjects.forEach(subj => {
         if (_.includes(combination, subj)) {
-          zeroQuotaCombinations.push(combinationId)
+          zeroPlacesCombinations.push(combinationId)
         }
       })
     })
-    return zeroQuotaCombinations
+    return zeroPlacesCombinations
   }
 
-  // retrieve students within the quota
+  // retrieve students within the place
   get inCutoffLineStudents () {
     const { COMBINATIONS, combinationPlaces, RANKS } = this
     // combinationId is just the order of the combination in COMBINATIONS
     return _.range(COMBINATIONS.length).map(combinationId => {
-      const combinationQuota = combinationPlaces[combinationId]
-      return RANKS.combinations[combinationId].slice(0, combinationQuota)
+      const combinationPlaces = combinationPlaces[combinationId]
+      return RANKS.combinations[combinationId].slice(0, combinationPlaces)
     })
   }
 
-  get firstChoiceInCutoffLineStudents () {
+  get highestPreferenceInCutoffLineStudents () {
     const { inCutoffLineStudents, findPriorityByCombinationId } = this
     return inCutoffLineStudents.map((studentIds, combinationId) => {
       // using map instead of filter, because need to hold the place for using _.zip
@@ -135,24 +134,24 @@ module.exports = class Allocation {
   }
 
   updateStudentsPreference () {
-    const { STUDENTS, zeroQuotaCombinations } = this
+    const { STUDENTS, zeroPlacesCombinations } = this
     STUDENTS.forEach(student =>
-      _.pull(student.preferences, ...zeroQuotaCombinations)
+      _.pull(student.preferences, ...zeroPlacesCombinations)
     )
   }
 
-  get firstStudentWithFirstChoiceInCutoffLine () {
-    const { firstChoiceInCutoffLineStudents, RANKS } = this
+  get firstStudentWithHighestPreferenceInCutoffLine () {
+    const { highestPreferenceInCutoffLineStudents, RANKS } = this
 
     // using .zip to convert queue in each combination to nth place of all combination
-    const zipped = _.zip(...firstChoiceInCutoffLineStudents)
-    const zippedFirstChoiceInCutoffLineStudents = _(zipped)
+    const zipped = _.zip(...highestPreferenceInCutoffLineStudents)
+    const zippedhighestPreferenceInCutoffLineStudents = _(zipped)
       .map(studentIds => _(studentIds).sortBy(id => RANKS.overall.indexOf(id)))
       .value()
 
     const flattenStudents = []
 
-    _(zippedFirstChoiceInCutoffLineStudents).forEach(ids => {
+    _(zippedhighestPreferenceInCutoffLineStudents).forEach(ids => {
       ids.forEach(id => flattenStudents.push(id))
     })
 
@@ -169,17 +168,17 @@ module.exports = class Allocation {
       COMBINATIONS,
       STUDENTS,
       firstStudentInOverallRanking,
-      firstStudentWithFirstChoiceInCutoffLine,
+      firstStudentWithHighestPreferenceInCutoffLine,
       findPriorityByCombinationId,
       updateFull,
-      removeIdFromRanks,
+      removeStudent,
       updateStudentsPreference,
-      updateFailures,
-      removeFromSTUDENTS
+      updateFailures
     } = this
 
     const id =
-      firstStudentWithFirstChoiceInCutoffLine || firstStudentInOverallRanking
+      firstStudentWithHighestPreferenceInCutoffLine ||
+      firstStudentInOverallRanking
 
     if (!id) {
       // student are not in rank, e.g. no exam / dropped out.
@@ -187,7 +186,7 @@ module.exports = class Allocation {
       return
     }
 
-    // update subject quota
+    // update subject place
     const student = _.find(STUDENTS, { id })
     if (!student) {
       updateFailures.call(this, id)
@@ -208,12 +207,11 @@ module.exports = class Allocation {
       highestPreference,
       false
     )
-    const x1 = combinations[0]
-    const x2 = combinations[1]
+
     const result = {
       id,
-      x1,
-      x2,
+      x1: combinations[0],
+      x2: combinations[1],
       preference,
       rank: RANKS.overall.indexOf(id),
       x1_order: SUBJECT_FILLED[x1].length + 1,
@@ -233,8 +231,7 @@ module.exports = class Allocation {
 
     // for either subject in combination is full, remove the combination
     updateStudentsPreference.call(this)
-    removeIdFromRanks.call(this, id)
-    removeFromSTUDENTS.call(this, id)
+    removeStudent.call(this, id)
   }
 
   iterate () {
