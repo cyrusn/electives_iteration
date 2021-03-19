@@ -10,22 +10,31 @@ const STUDENTS = require('./example/student.json')
 let COMBINATIONS = require('./example/combination.json')
 COMBINATIONS = COMBINATIONS.map(str => str.split('-'))
 
-console.log('total:', STUDENTS.length)
 const allocation = new Allocation(STUDENTS, RANKS, COMBINATIONS, SUBJECT_QUOTA)
-allocation.startLogging({ filename: 'log_example.csv' })
-// console.log('ranks: ', allocation.RANKS)
-allocation.iterate()
-const result = allocation.result
+
+const {
+  result,
+  failures,
+  full,
+  SUBJECT_PLACES,
+  STUDENTS: students,
+  startLogging,
+  iterate
+} = allocation
+
+console.log('total:', STUDENTS.length)
+startLogging({ filename: 'log_example.csv' })
+iterate()
 console.log('result: ', result.length)
-// const stages = allocation.stages
-console.log('failures: ', allocation.failures)
-console.log('places: ', allocation.SUBJECT_PLACES)
-console.log('full: ', allocation.full)
+console.log('failures: ', failures)
+console.log('places: ', SUBJECT_PLACES)
+console.log('full: ', full)
 console.log(
   'unassigned students:',
-  _.filter(allocation.STUDENTS, s => s.isConfirmed).length
+  _.filter(students, s => s.isConfirmed).length
 )
-// console.log('fillup order: ', allocation.SUBJECT_FILLED)
+// console.log('fill-up order: ', allocation.SUBJECT_FILLED)
+
 const parser = new Parser({
   fields: ['id', 'x1', 'x2', 'preference', 'rank', 'x1_order', 'x2_order']
 })

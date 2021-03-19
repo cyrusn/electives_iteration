@@ -227,8 +227,14 @@ module.exports = class Allocation {
   }
 
   iterate = () => {
-    const { isLog, logFileOption } = this
-    const { folder, filename } = logFileOption
+    const {
+      isLog,
+      IMMUNE_STUDENTS,
+      _iterate,
+      updateStages,
+      logFileOption: { folder, filename }
+    } = this
+
     const filePath = path.resolve(folder, filename)
     if (isLog) {
       fs.rmSync(folder, { recursive: true, force: true })
@@ -236,7 +242,6 @@ module.exports = class Allocation {
       fs.writeFileSync(filePath, '')
     }
 
-    const { _iterate, IMMUNE_STUDENTS, updateStages } = this
     _.range(IMMUNE_STUDENTS.length).forEach(n => {
       if (isLog) updateStages(n)
       _iterate()
@@ -268,6 +273,7 @@ module.exports = class Allocation {
           .value()
       })
       .value()
+
     const combinationRanks = _.zipObject(
       COMBINATIONS.map(s => s.join('-')),
       combinationWithPriority
@@ -289,12 +295,14 @@ module.exports = class Allocation {
     if (_.isEmpty(stage.overall)) return
 
     try {
+      const {
+        logFileOption: { folder, filename }
+      } = this
+
       const parser = new Parser()
       const csv = parser.parse(transform(stage))
       const csvAppend = parser.parse(logPlaces)
 
-      const { logFileOption } = this
-      const { folder, filename } = logFileOption
       const filePath = path.resolve(folder, filename)
 
       fs.appendFileSync(filePath, csvAppend + '\n')
